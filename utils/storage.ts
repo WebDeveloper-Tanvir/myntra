@@ -1,5 +1,5 @@
 import * as SecureStore from "expo-secure-store";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system";
 
 // User Data Storage (Secure)
 export const saveUserData = async (
@@ -38,7 +38,7 @@ export interface RecentlyViewedProduct {
   viewedAt: number;
 }
 
-const RECENTLY_VIEWED_KEY = "recently_viewed_products";
+const RECENTLY_VIEWED_FILE = `${FileSystem.documentDirectory}recently_viewed.json`;
 const MAX_RECENTLY_VIEWED = 20;
 
 export const saveRecentlyViewed = async (
@@ -62,9 +62,10 @@ export const saveRecentlyViewed = async (
     // Keep only the last 20 items
     const trimmed = updated.slice(0, MAX_RECENTLY_VIEWED);
 
-    await AsyncStorage.setItem(
-      RECENTLY_VIEWED_KEY,
-      JSON.stringify(trimmed)
+    await FileSystem.writeAsStringAsync(
+      RECENTLY_VIEWED_FILE,
+      JSON.stringify(trimmed),
+      { encoding: FileSystem.EncodingType.UTF8 }
     );
   } catch (error) {
     console.error("Error saving recently viewed product:", error);
@@ -73,8 +74,11 @@ export const saveRecentlyViewed = async (
 
 export const getRecentlyViewed = async (): Promise<RecentlyViewedProduct[]> => {
   try {
-    const data = await AsyncStorage.getItem(RECENTLY_VIEWED_KEY);
-    if (data) {
+    const fileExists = await FileSystem.getInfoAsync(RECENTLY_VIEWED_FILE);
+    if (fileExists.exists) {
+      const data = await FileSystem.readAsStringAsync(RECENTLY_VIEWED_FILE, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
       const products = JSON.parse(data) as RecentlyViewedProduct[];
       // Ensure sorted by most recent first
       return products.sort((a, b) => b.viewedAt - a.viewedAt);
@@ -88,7 +92,10 @@ export const getRecentlyViewed = async (): Promise<RecentlyViewedProduct[]> => {
 
 export const clearRecentlyViewed = async (): Promise<void> => {
   try {
-    await AsyncStorage.removeItem(RECENTLY_VIEWED_KEY);
+    const fileExists = await FileSystem.getInfoAsync(RECENTLY_VIEWED_FILE);
+    if (fileExists.exists) {
+      await FileSystem.deleteAsync(RECENTLY_VIEWED_FILE);
+    }
   } catch (error) {
     console.error("Error clearing recently viewed products:", error);
   }
